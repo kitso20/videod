@@ -1,6 +1,7 @@
 """yt-dlp wrapper: metadata probing, background download queue and progress."""
 from __future__ import annotations
 
+import os
 import threading
 import time
 import uuid
@@ -19,8 +20,8 @@ except Exception:  # noqa: BLE001
     pass
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DOWNLOAD_DIR = BASE_DIR / "downloads"
-DOWNLOAD_DIR.mkdir(exist_ok=True)
+DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_DIR", BASE_DIR / "downloads"))
+DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 AUDIO_QUALITIES = ["128", "192", "256", "320"]
 

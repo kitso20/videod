@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: videod
+    runtime: docker
+    plan: free
+    dockerfilePath: ./videoD/Dockerfile
+    dockerContext: ./videoD
+    healthCheckPath: /
+    envVars:
+      - key: DOWNLOAD_DIR
+        value: /tmp/downloads
