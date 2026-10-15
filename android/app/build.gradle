@@ -1,0 +1,67 @@
+plugins {
+    id 'com.android.application'
+    id 'com.chaquo.python'
+}
+
+def repoRoot = file("${rootDir}/..")
+def pyGen = file("${buildDir}/pygensrc")
+
+// Keep the packaged Python tree in sync with the repo checkout, so the APK
+// always reflects app/ and static/ (and server.py). Runs at configuration
+// time to guarantee it happens before Chaquopy packages anything.
+copy {
+    into pyGen
+    from("${repoRoot}/app") {
+        include '**/*.py'
+        exclude 'main.py'
+        into 'app'
+    }
+    from("${repoRoot}/static") {
+        into 'static'
+    }
+    from("${projectDir}/src/main/python") {
+        include 'server.py'
+    }
+}
+
+android {
+    namespace 'com.videod.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.videod.app'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        version = '3.12'
+        pip {
+            install 'yt-dlp'
+            install 'certifi'
+        }
+    }
+    sourceSets {
+        main {
+            srcDirs = [pyGen.absolutePath]
+        }
+    }
+}

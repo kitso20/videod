@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import os
+import shutil
 import threading
 import time
 import uuid
@@ -13,10 +14,11 @@ from typing import Any
 
 import yt_dlp
 
-try:  # make a bundled static ffmpeg discoverable when the system lacks one
-    import static_ffmpeg
+try:  # bundled static ffmpeg only when no system ffmpeg is available
+    if shutil.which("ffmpeg") is None:
+        import static_ffmpeg
 
-    static_ffmpeg.add_paths()
+        static_ffmpeg.add_paths()
 except Exception:  # noqa: BLE001
     pass
 
@@ -53,6 +55,11 @@ def _cookie_opts() -> dict[str, Any]:
 
 AUDIO_QUALITIES = ["128", "192", "256", "320"]
 
+
+def _has_ffmpeg() -> bool:
+    """True when an ffmpeg binary is reachable (system, bundled, or static)."""
+    return shutil.which("ffmpeg") is not None
+
 QUALITY_PRESETS = [
     {"id": "2160", "label": "4K (2160p)", "height": 2160},
     {"id": "1440", "label": "2K (1440p)", "height": 1440},
@@ -71,6 +78,7 @@ class Task:
     mode: str  # "video" | "audio"
     quality: str
     client_id: str = ""  # owning device; tasks are only visible to that device
+    cookies_from_browser: str = ""  # browser name for yt-dlp cookie auth
     title: str = "Fetching..."
     thumbnail: str = ""
     status: str = "queued"  # queued | downloading | processing | done | error | canceled
@@ -158,8 +166,22 @@ class DownloadManager:
         }
 
     # ---------- queue ----------
-    def enqueue(self, url: str, mode: str, quality: str, client_id: str = "") -> Task:
-        task = Task(id=uuid.uuid4().hex[:12], url=url, mode=mode, quality=quality, client_id=client_id)
+    def enqueue(
+        self,
+        url: str,
+        mode: str,
+        quality: str,
+        client_id: str = "",
+        cookies_from_browser: str = "",
+    ) -> Task:
+        task = Task(
+            id=uuid.uuid4().hex[:12],
+            url=url,
+            mode=mode,
+            quality=quality,
+            client_id=client_id,
+            cookies_from_browser=cookies_from_browser,
+        )
         with self._lock:
             self.tasks[task.id] = task
         self.queue.put(task.id)
@@ -225,25 +247,33 @@ class DownloadManager:
             "paths": {"home": str(STREAM_DIR)},
         }
         opts.update(_cookie_opts())
+        if task.cookies_from_browser:
+            opts["cookiesfrombrowser"] = (task.cookies_from_browser,)
 
+        have_ffmpeg = _has_ffmpeg()
         if task.mode == "audio":
             opts["format"] = "bestaudio/best"
-            opts["postprocessors"] = [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": task.quality or "192",
-                }
-            ]
+            if have_ffmpeg:
+                opts["postprocessors"] = [
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": task.quality or "192",
+                    }
+                ]
         else:
             h = task.quality
-            if h == "best":
+            if not have_ffmpeg:
+                # No ffmpeg: only single-stream (video+audio) formats are usable.
+                opts["format"] = "best" if h == "best" else f"best[height<={h}]/best"
+            elif h == "best":
                 opts["format"] = "bestvideo+bestaudio/best"
+                opts["merge_output_format"] = "mp4"
             else:
                 opts["format"] = (
                     f"bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
                 )
-            opts["merge_output_format"] = "mp4"
+                opts["merge_output_format"] = "mp4"
 
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(task.url, download=True)
@@ -252,12 +282,11 @@ class DownloadManager:
             if not task.thumbnail:
                 task.thumbnail = info.get("thumbnail") or ""
             path = ydl.prepare_filename(info)
-            if task.mode == "audio":
-                path = str(Path(path).with_suffix(".mp3"))
-            elif not Path(path).exists():
-                for ext in (".mp4", ".mkv", ".webm"):
-                    if Path(path).with_suffix(ext).exists():
-                        path = str(Path(path).with_suffix(ext))
+            if not Path(path).exists():
+                for ext in (".mp3", ".mp4", ".mkv", ".webm", ".m4a", ".opus", ".ogg"):
+                    cand = Path(path).with_suffix(ext)
+                    if cand.exists():
+                        path = str(cand)
                         break
             task.filename = Path(path).name
             task.filesize = Path(path).stat().st_size if Path(path).exists() else task.filesize
