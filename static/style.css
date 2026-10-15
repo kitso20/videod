@@ -43,6 +43,7 @@ main {
 }
 
 .row { display: flex; gap: 10px; }
+.row > * { min-width: 0; }
 
 input[type="url"], select {
   flex: 1;
@@ -74,8 +75,9 @@ button:active { transform: scale(0.97); }
 .ghost:hover { color: var(--text); border-color: var(--muted); }
 
 .preview { display: flex; gap: 14px; margin-top: 16px; align-items: center; }
-.preview img { width: 160px; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; background: #000; }
-.preview h2 { font-size: 1.05rem; margin: 0 0 6px; }
+.preview img { width: 160px; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; background: #000; flex-shrink: 0; }
+.preview .meta { min-width: 0; }
+.preview h2 { font-size: 1.05rem; margin: 0 0 6px; overflow-wrap: anywhere; }
 .preview p { color: var(--muted); margin: 0; font-size: 0.85rem; }
 
 .options { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; }
@@ -103,7 +105,7 @@ select { width: 100%; }
 
 .bar { height: 6px; background: #2a313d; border-radius: 999px; margin: 10px 0 6px; overflow: hidden; }
 .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.3s ease; }
-.item .sub { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); }
+.item .sub { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
 .item .actions { display: flex; gap: 8px; margin-top: 10px; }
 .item .actions a, .item .actions button { font-size: 0.8rem; padding: 7px 12px; border-radius: 8px; text-decoration: none; }
 .item .actions a { background: var(--accent); color: #fff; font-weight: 600; }
@@ -112,3 +114,23 @@ select { width: 100%; }
 .error { color: var(--err); font-size: 0.88rem; }
 .muted { color: var(--muted); font-size: 0.9rem; }
 .hidden { display: none !important; }
+
+@media (max-width: 600px) {
+  header { padding: 24px 14px 6px; }
+  header h1 { font-size: 1.9rem; }
+  main { padding: 14px; gap: 14px; }
+  .card { padding: 14px; }
+
+  input[type="url"], select, button, .seg button { font-size: 16px; }
+
+  .row { flex-direction: column; }
+  .row .primary { width: 100%; padding: 13px; }
+
+  .preview { flex-direction: column; align-items: stretch; }
+  .preview img { width: 100%; }
+
+  .seg { display: flex; width: 100%; }
+  .seg button { flex: 1; padding: 11px 10px; }
+
+  .item .top { flex-wrap: wrap; align-items: center; }
+}

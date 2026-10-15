@@ -24,6 +24,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_DIR", BASE_DIR / "downloads"))
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# Files live here only between "download finished" and "streamed to the device
+# that asked for it" — the server keeps no copy afterwards.
+STREAM_DIR = Path(os.environ.get("STREAM_DIR", DOWNLOAD_DIR / ".stream"))
+STREAM_DIR.mkdir(parents=True, exist_ok=True)
+for _leftover in STREAM_DIR.iterdir():
+    try:
+        _leftover.unlink()
+    except OSError:
+        pass
+
 
 def _cookie_opts() -> dict[str, Any]:
     """Resolve yt-dlp cookie options from env.
@@ -60,6 +70,7 @@ class Task:
     url: str
     mode: str  # "video" | "audio"
     quality: str
+    client_id: str = ""  # owning device; tasks are only visible to that device
     title: str = "Fetching..."
     thumbnail: str = ""
     status: str = "queued"  # queued | downloading | processing | done | error | canceled
@@ -147,8 +158,8 @@ class DownloadManager:
         }
 
     # ---------- queue ----------
-    def enqueue(self, url: str, mode: str, quality: str) -> Task:
-        task = Task(id=uuid.uuid4().hex[:12], url=url, mode=mode, quality=quality)
+    def enqueue(self, url: str, mode: str, quality: str, client_id: str = "") -> Task:
+        task = Task(id=uuid.uuid4().hex[:12], url=url, mode=mode, quality=quality, client_id=client_id)
         with self._lock:
             self.tasks[task.id] = task
         self.queue.put(task.id)
@@ -162,9 +173,12 @@ class DownloadManager:
             task.status = "canceled"
             return True
 
-    def list_tasks(self) -> list[dict[str, Any]]:
+    def list_tasks(self, client_id: str | None = None) -> list[dict[str, Any]]:
         with self._lock:
-            return [t.to_dict() for t in sorted(self.tasks.values(), key=lambda x: x.created, reverse=True)]
+            tasks = self.tasks.values()
+            if client_id is not None:
+                tasks = [t for t in tasks if t.client_id == client_id]
+            return [t.to_dict() for t in sorted(tasks, key=lambda x: x.created, reverse=True)]
 
     def get(self, task_id: str) -> Task | None:
         with self._lock:
@@ -184,7 +198,7 @@ class DownloadManager:
                 task.error = str(exc).splitlines()[0][:300]
 
     def _download(self, task: Task) -> None:
-        outtmpl = str(DOWNLOAD_DIR / "%(title).150B [%(id)s].%(ext)s")
+        outtmpl = str(STREAM_DIR / "%(title).150B [%(id)s].%(ext)s")
 
         def hook(d: dict[str, Any]) -> None:
             if task.status == "canceled":
@@ -208,7 +222,7 @@ class DownloadManager:
             "no_warnings": True,
             "progress_hooks": [hook],
             "postprocessor_hooks": [lambda d: setattr(task, "status", "processing")],
-            "paths": {"home": str(DOWNLOAD_DIR)},
+            "paths": {"home": str(STREAM_DIR)},
         }
         opts.update(_cookie_opts())
 

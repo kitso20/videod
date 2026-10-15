@@ -1,4 +1,19 @@
 const $ = (id) => document.getElementById(id);
+
+const CLIENT_KEY = "videod_client_id";
+function clientId() {
+  let id = localStorage.getItem(CLIENT_KEY);
+  if (!id) {
+    id = crypto.randomUUID
+      ? crypto.randomUUID()
+      : Date.now().toString(36) + Math.random().toString(36).slice(2);
+    localStorage.setItem(CLIENT_KEY, id);
+  }
+  return id;
+}
+const CID = clientId();
+const authHeaders = { "X-Client-Id": CID };
+
 const urlInput = $("url");
 const fetchBtn = $("fetch");
 const downloadBtn = $("download");
@@ -40,7 +55,7 @@ async function fetchInfo() {
   try {
     const res = await fetch("/api/probe", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({ url }),
     });
     const data = await res.json();
@@ -72,7 +87,7 @@ async function startDownload() {
   try {
     await fetch("/api/download", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify(payload),
     });
   } finally {
@@ -97,6 +112,18 @@ const BADGE = {
   canceled: "Canceled",
 };
 
+function autoDownload(t) {
+  const a = document.createElement("a");
+  a.href = `/api/files/${encodeURIComponent(t.filename)}?cid=${encodeURIComponent(CID)}`;
+  a.download = t.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+let bootstrapped = false;
+const doneSeen = new Set();
+
 function render(tasks) {
   const active = tasks.filter((t) => !["done", "error", "canceled"].includes(t.status));
   emptyEl.classList.toggle("hidden", tasks.length > 0);
@@ -112,7 +139,7 @@ function render(tasks) {
           : `${pct.toFixed(0)}% ${t.speed ? "· " + t.speed : ""} ${t.eta ? "· ETA " + t.eta : ""}`;
       const actions = [];
       if (t.status === "done") {
-        actions.push(`<a href="/api/files/${encodeURIComponent(t.filename)}" download>Download</a>`);
+        actions.push(`<a href="/api/files/${encodeURIComponent(t.filename)}?cid=${encodeURIComponent(CID)}" download>Download</a>`);
         actions.push(`<button data-remove="${t.id}">Remove</button>`);
       } else if (["queued", "downloading", "processing"].includes(t.status)) {
         actions.push(`<button data-cancel="${t.id}">Cancel</button>`);
@@ -130,6 +157,18 @@ function render(tasks) {
       </li>`;
     })
     .join("");
+
+  if (!bootstrapped) {
+    tasks.forEach((t) => { if (t.status === "done") doneSeen.add(t.id); });
+    bootstrapped = true;
+    return;
+  }
+  tasks.forEach((t) => {
+    if (t.status === "done" && !doneSeen.has(t.id) && t.filename) {
+      doneSeen.add(t.id);
+      autoDownload(t);
+    }
+  });
 }
 
 function escapeHtml(s) {
@@ -139,17 +178,17 @@ function escapeHtml(s) {
 queueEl.addEventListener("click", async (e) => {
   const cancelId = e.target.dataset?.cancel;
   const removeId = e.target.dataset?.remove;
-  if (cancelId) await fetch(`/api/tasks/${cancelId}/cancel`, { method: "POST" });
-  if (removeId) await fetch(`/api/tasks/${removeId}`, { method: "DELETE" });
+  if (cancelId) await fetch(`/api/tasks/${cancelId}/cancel`, { method: "POST", headers: { ...authHeaders } });
+  if (removeId) await fetch(`/api/tasks/${removeId}`, { method: "DELETE", headers: { ...authHeaders } });
 });
 
 $("clear").addEventListener("click", async () => {
-  const res = await fetch("/api/tasks");
+  const res = await fetch("/api/tasks", { headers: { ...authHeaders } });
   const tasks = await res.json();
   await Promise.all(
     tasks
       .filter((t) => ["done", "error", "canceled"].includes(t.status))
-      .map((t) => fetch(`/api/tasks/${t.id}`, { method: "DELETE" }))
+      .map((t) => fetch(`/api/tasks/${t.id}`, { method: "DELETE", headers: { ...authHeaders } }))
   );
 });
 
@@ -157,5 +196,5 @@ fetchBtn.addEventListener("click", fetchInfo);
 downloadBtn.addEventListener("click", startDownload);
 urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") fetchInfo(); });
 
-const es = new EventSource("/api/events");
+const es = new EventSource(`/api/events?cid=${CID}`);
 es.onmessage = (e) => render(JSON.parse(e.data));

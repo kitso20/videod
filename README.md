@@ -11,7 +11,8 @@ background queue and live progress.
 - Quality picker (2160p / 1440p / 1080p / 720p / 480p / 360p / best available)
 - Audio-only MP3 extraction (128–320 kbps)
 - Background download queue: multiple downloads, live progress, speed, ETA
-- Cancel active downloads, remove finished ones, re-download from local store
+- Files stream straight to the device that requested them — the server keeps no copy
+- Cancel active downloads, remove finished ones
 
 ## Requirements
 
@@ -43,14 +44,14 @@ python3 -m venv .venv
   `/api/events` SSE stream, `/api/files/{name}`).
 - `static/` — no-build vanilla HTML/CSS/JS front end.
 
-Downloaded files are saved to `downloads/` and served through the app so you can
-grab them with the browser's own download.
+Finished files are streamed straight into your browser's downloads and removed
+from the server right after — nothing piles up in `downloads/`.
 
 ## Configuration
 
 | Env var        | Default              | Purpose                                                        |
 | -------------- | -------------------- | -------------------------------------------------------------- |
-| `DOWNLOAD_DIR` | `downloads/`         | Where downloaded files are stored.                             |
+| `DOWNLOAD_DIR` | `downloads/`         | Base folder; the short-lived `.stream` temp dir lives inside it. |
 | `COOKIES_FILE` | —                    | Path to a Netscape `cookies.txt` (for bot/login-gated sites).  |
 | `COOKIES_B64`  | —                    | Base64-encoded `cookies.txt`; useful on hosts with no disk.    |
 
@@ -86,6 +87,7 @@ and you can ignore the deploy job.)
 - YouTube blocks most datacenter IPs ("sign in to confirm you're not a bot"). On a
   server, export cookies from a logged-in browser to `cookies.txt` and set
   `COOKIES_FILE`/`COOKIES_B64`. Locally it usually works without them.
-- On Render's free plan the disk is ephemeral, so downloads disappear on
-  restart/redeploy. Add a persistent disk if you need a lasting store.
+- The server only holds a file for the seconds between finishing the download
+  and streaming it to your device, so ephemeral disks (e.g. Render free plan)
+  are fine — nothing needs to survive a restart.
 - Only download content you have the right to.
