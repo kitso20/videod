@@ -8,7 +8,6 @@
         android:maxSdkVersion="28" />
 
     <application
-        android:name="com.chaquo.python.android.PyApplication"
         android:label="viDeoD"
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">

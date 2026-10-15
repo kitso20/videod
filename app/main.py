@@ -19,6 +19,8 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 _CID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 
+_ALLOWED_BROWSERS = {"brave", "chrome", "chromium", "edge", "firefox", "opera", "safari", "vivaldi", "whale"}
+
 
 def _unlink_quiet(path: Path) -> None:
     try:
@@ -57,14 +59,18 @@ class DownloadRequest(BaseModel):
     url: str
     mode: str = "video"
     quality: str = "1080"
+    cookies_from_browser: str | None = None
 
 
 @app.post("/api/probe")
 def probe(req: ProbeRequest):
     if not req.url.strip():
         raise HTTPException(400, "URL is required")
+    cfb = (req.cookies_from_browser or "").strip()
+    if cfb and cfb not in _ALLOWED_BROWSERS:
+        raise HTTPException(400, f"Unsupported browser: {cfb}")
     try:
-        return manager.probe(req.url.strip(), req.cookies_from_browser)
+        return manager.probe(req.url.strip(), cfb or None)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, str(exc).splitlines()[0][:300]) from exc
 
@@ -75,7 +81,16 @@ def start_download(req: DownloadRequest, request: Request):
         raise HTTPException(400, "URL is required")
     if req.mode not in ("video", "audio"):
         raise HTTPException(400, "mode must be 'video' or 'audio'")
-    task = manager.enqueue(req.url.strip(), req.mode, req.quality, _client_id(request))
+    cfb = (req.cookies_from_browser or "").strip()
+    if cfb and cfb not in _ALLOWED_BROWSERS:
+        raise HTTPException(400, f"Unsupported browser: {cfb}")
+    task = manager.enqueue(
+        req.url.strip(),
+        req.mode,
+        req.quality,
+        _client_id(request),
+        cfb,
+    )
     return task.to_dict()
 
 

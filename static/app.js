@@ -23,6 +23,12 @@ const options = $("options");
 const probeError = $("probe-error");
 const queueEl = $("queue");
 const emptyEl = $("empty");
+const cookiesSel = $("cookies-browser");
+
+const COOKIES_KEY = "videod_cookies_browser";
+if (localStorage.getItem(COOKIES_KEY)) cookiesSel.value = localStorage.getItem(COOKIES_KEY);
+cookiesSel.addEventListener("change", () => localStorage.setItem(COOKIES_KEY, cookiesSel.value));
+const cookiesFromBrowser = () => cookiesSel.value || null;
 
 let current = null;
 let mode = "video";
@@ -56,7 +62,7 @@ async function fetchInfo() {
     const res = await fetch("/api/probe", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, cookies_from_browser: cookiesFromBrowser() }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Failed to fetch");
@@ -83,7 +89,7 @@ async function fetchInfo() {
 async function startDownload() {
   if (!current) return;
   downloadBtn.disabled = true;
-  const payload = { url: urlInput.value.trim(), mode, quality: qualitySel.value };
+  const payload = { url: urlInput.value.trim(), mode, quality: qualitySel.value, cookies_from_browser: cookiesFromBrowser() };
   try {
     await fetch("/api/download", {
       method: "POST",
@@ -113,6 +119,10 @@ const BADGE = {
 };
 
 function autoDownload(t) {
+  if (window.AndroidBridge && window.AndroidBridge.save) {
+    window.AndroidBridge.save(t.filename, CID);
+    return;
+  }
   const a = document.createElement("a");
   a.href = `/api/files/${encodeURIComponent(t.filename)}?cid=${encodeURIComponent(CID)}`;
   a.download = t.filename;
@@ -139,7 +149,7 @@ function render(tasks) {
           : `${pct.toFixed(0)}% ${t.speed ? "· " + t.speed : ""} ${t.eta ? "· ETA " + t.eta : ""}`;
       const actions = [];
       if (t.status === "done") {
-        actions.push(`<a href="/api/files/${encodeURIComponent(t.filename)}?cid=${encodeURIComponent(CID)}" download>Download</a>`);
+        actions.push(`<a href="/api/files/${encodeURIComponent(t.filename)}?cid=${encodeURIComponent(CID)}" data-file="${escapeHtml(t.filename)}" download>Download</a>`);
         actions.push(`<button data-remove="${t.id}">Remove</button>`);
       } else if (["queued", "downloading", "processing"].includes(t.status)) {
         actions.push(`<button data-cancel="${t.id}">Cancel</button>`);
@@ -176,6 +186,12 @@ function escapeHtml(s) {
 }
 
 queueEl.addEventListener("click", async (e) => {
+  const dlLink = e.target.closest ? e.target.closest("a[data-file]") : null;
+  if (dlLink && window.AndroidBridge && window.AndroidBridge.save) {
+    e.preventDefault();
+    window.AndroidBridge.save(dlLink.dataset.file, CID);
+    return;
+  }
   const cancelId = e.target.dataset?.cancel;
   const removeId = e.target.dataset?.remove;
   if (cancelId) await fetch(`/api/tasks/${cancelId}/cancel`, { method: "POST", headers: { ...authHeaders } });

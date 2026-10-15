@@ -60,6 +60,19 @@ def _has_ffmpeg() -> bool:
     """True when an ffmpeg binary is reachable (system, bundled, or static)."""
     return shutil.which("ffmpeg") is not None
 
+
+def _yt_net_opts() -> dict[str, Any]:
+    """Pin requests to IPv4 to dodge YouTube's IPv6-range bot checks.
+
+    Some ISPs' IPv6 ranges are flagged, so binding the source address to
+    ``0.0.0.0`` (what ``--force-ipv4`` does) avoids "Sign in to confirm you're
+    not a bot" without needing cookies. We deliberately leave yt-dlp's default
+    player clients alone: forcing ``android`` would break cookie auth (that
+    client does not support cookies) and require a PO token.
+    """
+    return {"source_address": "0.0.0.0"}
+
+
 QUALITY_PRESETS = [
     {"id": "2160", "label": "4K (2160p)", "height": 2160},
     {"id": "1440", "label": "2K (1440p)", "height": 1440},
@@ -139,6 +152,7 @@ class DownloadManager:
         opts.update(_cookie_opts())
         if cookies_from_browser:
             opts["cookiesfrombrowser"] = (cookies_from_browser,)
+        opts.update(_yt_net_opts())
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
@@ -249,11 +263,12 @@ class DownloadManager:
         opts.update(_cookie_opts())
         if task.cookies_from_browser:
             opts["cookiesfrombrowser"] = (task.cookies_from_browser,)
+        opts.update(_yt_net_opts())
 
         have_ffmpeg = _has_ffmpeg()
         if task.mode == "audio":
-            opts["format"] = "bestaudio/best"
             if have_ffmpeg:
+                opts["format"] = "bestaudio/best"
                 opts["postprocessors"] = [
                     {
                         "key": "FFmpegExtractAudio",
@@ -261,11 +276,17 @@ class DownloadManager:
                         "preferredquality": task.quality or "192",
                     }
                 ]
+            else:
+                # No ffmpeg: save a directly-playable AAC (m4a) stream.
+                opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
         else:
             h = task.quality
             if not have_ffmpeg:
-                # No ffmpeg: only single-stream (video+audio) formats are usable.
-                opts["format"] = "best" if h == "best" else f"best[height<={h}]/best"
+                # No ffmpeg: only single-stream formats are usable; prefer MP4.
+                if h == "best":
+                    opts["format"] = "best[ext=mp4]/best"
+                else:
+                    opts["format"] = f"best[height<={h}][ext=mp4]/best[height<={h}]/best"
             elif h == "best":
                 opts["format"] = "bestvideo+bestaudio/best"
                 opts["merge_output_format"] = "mp4"
