@@ -3,8 +3,8 @@ services:
     name: videod
     runtime: docker
     plan: free
-    dockerfilePath: ./videoD/Dockerfile
-    dockerContext: ./videoD
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /api/health
     envVars:
       - key: DOWNLOAD_DIR

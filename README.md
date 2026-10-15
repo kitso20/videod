@@ -22,7 +22,6 @@ background queue and live progress.
 ## Setup & run
 
 ```bash
-cd videoD
 ./run.sh
 ```
 
@@ -51,7 +50,7 @@ grab them with the browser's own download.
 
 | Env var        | Default              | Purpose                                                        |
 | -------------- | -------------------- | -------------------------------------------------------------- |
-| `DOWNLOAD_DIR` | `videoD/downloads`   | Where downloaded files are stored.                             |
+| `DOWNLOAD_DIR` | `downloads/`         | Where downloaded files are stored.                             |
 | `COOKIES_FILE` | —                    | Path to a Netscape `cookies.txt` (for bot/login-gated sites).  |
 | `COOKIES_B64`  | —                    | Base64-encoded `cookies.txt`; useful on hosts with no disk.    |
 
@@ -63,8 +62,8 @@ This is a **web service**, not a static site (it runs Python + ffmpeg).
 
 - Easiest: `New +` → **Blueprint** → pick this repo. `render.yaml` provisions a
   Docker web service automatically.
-- Manual: `New +` → **Web Service** → Runtime **Docker**, Root Directory `videoD`,
-  Dockerfile Path `videoD/Dockerfile`.
+- Manual: `New +` → **Web Service** → Runtime **Docker**, leave Root Directory
+  empty (repo root), Dockerfile Path `Dockerfile`.
 
 The container installs ffmpeg and listens on `$PORT` with a `/api/health` check.
 
@@ -83,7 +82,7 @@ and you can ignore the deploy job.)
 
 ## Notes
 
-- Keep `yt-dlp` up to date (`./.venv/bin/pip install -U yt-dlp`); sites change often.
+- Keep `yt-dlp` up to date (`./.venv/bin/python -m pip install -U yt-dlp`); sites change often.
 - YouTube blocks most datacenter IPs ("sign in to confirm you're not a bot"). On a
   server, export cookies from a logged-in browser to `cookies.txt` and set
   `COOKIES_FILE`/`COOKIES_B64`. Locally it usually works without them.

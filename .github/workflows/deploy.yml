@@ -13,9 +13,6 @@ jobs:
   test:
     name: Test & build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: videoD
     steps:
       - uses: actions/checkout@v4
 
@@ -23,7 +20,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: videoD/requirements.txt
+          cache-dependency-path: requirements.txt
 
       - name: Install dependencies
         run: |
@@ -66,7 +63,7 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: videoD
+          context: .
           push: true
           tags: |
             ${{ env.IMAGE }}:latest
