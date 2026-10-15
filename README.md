@@ -73,7 +73,7 @@ The container installs ffmpeg and listens on `$PORT` with a `/api/health` check.
 `.github/workflows/deploy.yml` runs on every push/PR to `main`:
 
 1. **test** — installs deps, imports the app, hits `/api/health`, builds the image.
-2. **publish** — pushes the image to GHCR (`ghcr.io/<owner>/<repo>/videod`).
+2. **publish** — pushes the image to GHCR (`ghcr.io/<owner>/videod`).
 3. **deploy** — calls a Render deploy hook, if the `RENDER_DEPLOY_HOOK` secret is set.
 
 To enable deploys: Render service → **Settings → Deploy Hook**, copy the URL, then
