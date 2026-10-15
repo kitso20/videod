@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>viDeoD — Video Downloader</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>vi<span>Deo</span>D</h1>
+    <p class="tag">Paste a link, pick your quality, download.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="row">
+        <input id="url" type="url" placeholder="https://youtube.com/watch?v=...  or any supported link" autocomplete="off" />
+        <button id="fetch" class="primary">Fetch</button>
+      </div>
+      <p id="probe-error" class="error hidden"></p>
+
+      <div id="preview" class="preview hidden">
+        <img id="thumb" alt="" />
+        <div class="meta">
+          <h2 id="title"></h2>
+          <p id="sub"></p>
+        </div>
+      </div>
+
+      <div id="options" class="options hidden">
+        <div class="opt-group">
+          <label>Type</label>
+          <div class="seg" id="mode-seg">
+            <button data-mode="video" class="active">Video (MP4)</button>
+            <button data-mode="audio">Audio (MP3)</button>
+          </div>
+        </div>
+        <div class="opt-group" id="quality-group">
+          <label>Quality</label>
+          <select id="quality"></select>
+        </div>
+        <button id="download" class="primary big">Download</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="queue-head">
+        <h2>Downloads</h2>
+        <button id="clear" class="ghost">Clear finished</button>
+      </div>
+      <ul id="queue"></ul>
+      <p id="empty" class="muted">No downloads yet.</p>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
