@@ -1,6 +1,7 @@
 """yt-dlp wrapper: metadata probing, background download queue and progress."""
 from __future__ import annotations
 
+import base64
 import os
 import threading
 import time
@@ -22,6 +23,23 @@ except Exception:  # noqa: BLE001
 BASE_DIR = Path(__file__).resolve().parent.parent
 DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_DIR", BASE_DIR / "downloads"))
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _cookie_opts() -> dict[str, Any]:
+    """Resolve yt-dlp cookie options from env.
+
+    COOKIES_FILE: path to a Netscape cookie file.
+    COOKIES_B64:  base64-encoded Netscape cookie file (written to a temp file).
+    """
+    path = os.environ.get("COOKIES_FILE", "").strip()
+    if not path and os.environ.get("COOKIES_B64"):
+        target = Path(os.environ.get("TMPDIR", "/tmp")) / "videod_cookies.txt"
+        try:
+            target.write_bytes(base64.b64decode(os.environ["COOKIES_B64"]))
+            path = str(target)
+        except Exception:  # noqa: BLE001
+            path = ""
+    return {"cookiefile": path} if path and Path(path).is_file() else {}
 
 AUDIO_QUALITIES = ["128", "192", "256", "320"]
 
@@ -99,6 +117,7 @@ class DownloadManager:
             "skip_download": True,
             "noplaylist": True,
         }
+        opts.update(_cookie_opts())
         if cookies_from_browser:
             opts["cookiesfrombrowser"] = (cookies_from_browser,)
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -191,6 +210,7 @@ class DownloadManager:
             "postprocessor_hooks": [lambda d: setattr(task, "status", "processing")],
             "paths": {"home": str(DOWNLOAD_DIR)},
         }
+        opts.update(_cookie_opts())
 
         if task.mode == "audio":
             opts["format"] = "bestaudio/best"

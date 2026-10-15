@@ -16,6 +16,11 @@ app = FastAPI(title="viDeoD")
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
+
+
 class ProbeRequest(BaseModel):
     url: str
     cookies_from_browser: str | None = None

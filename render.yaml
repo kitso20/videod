@@ -5,7 +5,11 @@ services:
     plan: free
     dockerfilePath: ./videoD/Dockerfile
     dockerContext: ./videoD
-    healthCheckPath: /
+    healthCheckPath: /api/health
     envVars:
       - key: DOWNLOAD_DIR
         value: /tmp/downloads
+      # Optional: paste a base64-encoded Netscape cookies.txt to bypass YouTube
+      # "sign in to confirm you're not a bot" on datacenter IPs.
+      - key: COOKIES_B64
+        sync: false
